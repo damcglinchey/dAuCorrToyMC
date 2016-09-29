@@ -19,6 +19,19 @@ def gen_part(vn, psi, order=2, N=100):
     return rand
 
 
+def gen_psi(Psi0, eta, sigd):
+    '''
+    Generate the event plane angles
+    Assume linear decorrelation with random slope:
+    Psi(eta, sigd) = G(0, sigd)*eta + Psi0
+    '''
+    # Generate random slope
+    m = np.random.normal(0, sigd, len(Psi0))
+    # Calculate psi
+    Psi = m*eta + Psi0
+    return Psi
+
+
 def calc_cn(d, order):
     '''
     Calculate the correlation coefficients numerically
@@ -74,6 +87,8 @@ def calc_vn3sub(cAB, cAC, cBC):
     err = np.sqrt((dcAB*cAB[1])**2 + (dcAC*cAC[1])**2 + (dcBC*cBC[1])**2)
 
     return np.array((val, err))
+
+
 
 
 

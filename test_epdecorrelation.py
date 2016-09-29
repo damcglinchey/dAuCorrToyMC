@@ -2,82 +2,99 @@ import numpy as np
 import matplotlib.pyplot as plt
 import corr_funcs as cf
 
-def test_epdecorrelation(v2true = 0.1,
-                         delta = 0.3,
-                         Nevent = 5000,
-                         Npart = 100):
+def test_epdecorrelation(Nevent = 5000,
+                         eta = np.array((-3.25, -2.0, 0.0, 2.0, 3.25)),
+                         ldet = ['BBCS', 'FVTXS', 'CNT', 'FVTXN', 'BBCN'],
+                         # Npart = np.array((10, 10, 10, 10, 10)),
+                         Npart = np.array((74, 17, 5, 9, 10)),
+                         v2true = np.array((0.1, 0.1, 0.1, 0.1, 0.1)),
+                         sigd = 0.0001,
+                         ):
     '''
     Test event plane decorrelation
-    v2true := true v2 which the samples will be generated with
-    delta  := event plane decorrelation angle
+    The code is set up to look in 5 separate regions defined by the
+    eta values, labels, and Npart arrays input as arguments
     Nevent := Number of events generated
-    Npart  := Numper of particles per region
+    eta    := Array of "detector" eta values
+    Npart  := Array of the numper of particles per region
+    v2true := Array of true v2 in each region
+    sigd   := Sigma value for the Gaussian EP decorrelation 
     '''
+
+    # Get the number of detectors
+    ndet = len(eta)
 
     # Print running conditions
     print("--------------------------------------------")
-    print(" v2true        : {}".format(v2true))
-    print(" delta         : {}".format(delta))
     print(" Nevent        : {}".format(Nevent))
+    print(" ndet          : {}".format(ndet))
+    print(" ldet          : {}".format(ldet))
+    print(" eta           : {}".format(eta))
     print(" Npart         : {}".format(Npart))
+    print(" v2true        : {}".format(v2true))
+    print(" sigd          : {}".format(sigd))
     print("--------------------------------------------")
 
-    # Generate random event planes in the north (N), mid (M), and south (S)
-    Psi_M = np.random.uniform(-np.pi, np.pi, Nevent)
-    Psi_N = Psi_M + delta
-    Psi_S = Psi_M - delta
+    # Generate random event planes 
+    # Assume linear decorrelation with random slope:
+    # Psi(eta, sigd) = G(0, sigd)*eta + Psi0
+    Psi0 = np.random.uniform(-np.pi, np.pi, Nevent)
+    m = np.random.normal(0, sigd, len(Psi0))
+    Psi = [(m*eta[i] + Psi0) for i in range(ndet)]
 
-    # print('Psi_M: {}'.format(Psi_M))
-    # print('Psi_N: {}'.format(Psi_N))
-    # print('Psi_S: {}'.format(Psi_S))
-
+    # print('Psi0:\n{}'.format(Psi0))
+    # print('m:\n{}'.format(m))
+    # print('Psi:\n{}'.format(Psi))
 
     # Generate particle's for each event
-    part_M = [cf.gen_part(v2true, Psi_M[i], 2, Npart) for i in range(Nevent)]
-    part_N1 = [cf.gen_part(v2true, Psi_N[i], 2, Npart) for i in range(Nevent)]
-    part_N2 = [cf.gen_part(v2true, Psi_N[i], 2, Npart) for i in range(Nevent)]
-    part_S1 = [cf.gen_part(v2true, Psi_S[i], 2, Npart) for i in range(Nevent)]
-    part_S2 = [cf.gen_part(v2true, Psi_S[i], 2, Npart) for i in range(Nevent)]
+    part = []
+    for i in range(ndet):
+        part.append([cf.gen_part(v2true[i], Psi[i][j], 2, Npart[i]) for j in range(Nevent)])
 
-    # print('part_M:\n{}'.format(part_M))
+    # for i in range(ndet):
+    #     print('Npart[{}] (Nevents: {}):\n{}'.format(i, 
+    #                                                 len(part[i]), 
+    #                                                 [len(part[i][j]) for j in range(Nevent)]))
 
-    # Calculate the delta phi correlations for different combinations
-    dphi_MN1 = np.concatenate([cf.calc_dphi(part_M[i], part_N1[i]) for i in range(Nevent)])
-    dphi_MN2 = np.concatenate([cf.calc_dphi(part_M[i], part_N2[i]) for i in range(Nevent)])
-    dphi_MS1 = np.concatenate([cf.calc_dphi(part_M[i], part_S1[i]) for i in range(Nevent)])
-    dphi_MS2 = np.concatenate([cf.calc_dphi(part_M[i], part_S2[i]) for i in range(Nevent)])
-    dphi_N1N2 = np.concatenate([cf.calc_dphi(part_N1[i], part_N2[i]) for i in range(Nevent)])
-    dphi_S1S2 = np.concatenate([cf.calc_dphi(part_S1[i], part_S2[i]) for i in range(Nevent)])
-    dphi_N1S1 = np.concatenate([cf.calc_dphi(part_N1[i], part_S1[i]) for i in range(Nevent)])
+    # Calculate the delta phi correlations for all combinations
+    dphi = []
+    for i in range(ndet):
+        dphii = []
+        for j in range(ndet):
+            dphii.append(np.concatenate([cf.calc_dphi(part[i][k], part[j][k]) for k in range(Nevent)]))
+        dphi.append(dphii)
+
+    # print('dphi:\n{}'.format(dphi))
+
+
 
     # Calculate the c2 coefficients for each correlation
-    c2_MN1 = cf.calc_v2(dphi_MN1)
-    c2_MN2 = cf.calc_v2(dphi_MN2)
-    c2_MS1 = cf.calc_v2(dphi_MS1)
-    c2_MS2 = cf.calc_v2(dphi_MS2)
-    c2_N1N2 = cf.calc_v2(dphi_N1N2)
-    c2_S1S2 = cf.calc_v2(dphi_S1S2)
-    c2_N1S1 = cf.calc_v2(dphi_N1S1)
+    c2 = []
+    for i in range(ndet):
+        c2tmp = []
+        for j in range(ndet):
+            c2tmp.append(cf.calc_v2(dphi[i][j]))
+        c2.append(c2tmp)
 
-    print('\n-- c2 values from 2 particle correlations--')
-    print('c2_MN1: {}'.format(c2_MN1))
-    print('c2_MN2: {}'.format(c2_MN2))
-    print('c2_MS1: {}'.format(c2_MS1))
-    print('c2_MS2: {}'.format(c2_MS2))
-    print('c2_N1N2: {}'.format(c2_N1N2))
-    print('c2_S1S2: {}'.format(c2_S1S2))
-    print('c2_N1S1: {}'.format(c2_N1S1))
+    print('\n-- c2 values --')
+    for i in range(ndet):
+        for j in range(ndet):
+            print('c2[{}][{}]({}-{})={}'.format(i, j, 
+                                                ldet[i], ldet[j], 
+                                                c2[i][j]))
 
 
     # Calculate v2
-    v2_MN1N2 = cf.calc_vn3sub(c2_MN1, c2_MN2, c2_N1N2)
-    v2_MS1S2 = cf.calc_vn3sub(c2_MS1, c2_MS2, c2_S1S2)
-    v2_MN1S1 = cf.calc_vn3sub(c2_MN1, c2_MS1, c2_N1S1)
+    v2_210 = cf.calc_vn3sub(c2[2][0], c2[2][1], c2[0][1])
+    v2_234 = cf.calc_vn3sub(c2[2][3], c2[2][4], c2[3][4])
+    v2_213 = cf.calc_vn3sub(c2[2][1], c2[2][3], c2[1][3])
+    v2_204 = cf.calc_vn3sub(c2[2][0], c2[2][4], c2[0][4])
 
-    print('\n-- v2 values from 2 particle correlations--')
-    print('v2_MN1N2: {}'.format(v2_MN1N2))
-    print('v2_MS1S2: {}'.format(v2_MS1S2))
-    print('v2_MN1S1: {}'.format(v2_MN1S1))
+    print('\n-- v2 values --')
+    print('v2({}-{}-{}) = {}'.format(ldet[2], ldet[1], ldet[0], v2_210))
+    print('v2({}-{}-{}) = {}'.format(ldet[2], ldet[3], ldet[4], v2_234))
+    print('v2({}-{}-{}) = {}'.format(ldet[2], ldet[1], ldet[3], v2_213))
+    print('v2({}-{}-{}) = {}'.format(ldet[2], ldet[0], ldet[4], v2_204))
 
 
 
@@ -85,28 +102,29 @@ def test_epdecorrelation(v2true = 0.1,
     # Make some plots
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    x = [0, 1, 2]
-    y = np.vstack((v2_MN1N2, v2_MS1S2, v2_MN1S1))
-    labels = ['MN1N2', 'MS1S2', 'MN1S1']
+    x = [0, 1, 2, 3]
+    y = np.vstack((v2_210, v2_234, v2_213, v2_204))
+    labels = ['{}-{}-{}'.format(ldet[2], ldet[1], ldet[0]),
+              '{}-{}-{}'.format(ldet[2], ldet[3], ldet[4]),
+              '{}-{}-{}'.format(ldet[2], ldet[1], ldet[3]),
+              '{}-{}-{}'.format(ldet[2], ldet[0], ldet[4])]
     # plt.xticks(x, labels, rotation='vertical')
-    plt.xticks(x, labels, rotation=45)
+    plt.xticks(x, labels, rotation=60, size=5)
 
     ax.set_ylim(0.05, 0.15)
-    ax.set_xlim(-0.5, 2.5)
+    ax.set_xlim(-0.5, 3.5)
 
     ax.errorbar(x, y[:, 0], yerr=y[:, 1],
                 ls='*', marker='o', ms=6, color='dodgerblue')
 
-    ax.axhline(y=v2true, linestyle='--', color='crimson')
+    ax.axhline(y=v2true[2], linestyle='--', color='crimson')
 
 
     ax.text(0.07, 0.95, r'$N_{event}=$' + '{}'.format(Nevent),
                    fontsize=10, transform=ax.transAxes)
-    ax.text(0.07, 0.90, r'$N_{part}=$' + '{}'.format(Npart),
+    ax.text(0.07, 0.90, r'$\sigma_{\Delta}=$' + '{:.2}'.format(sigd),
                    fontsize=10, transform=ax.transAxes)
-    ax.text(0.07, 0.85, r'$\Delta=$' + '{:.2}'.format(delta),
-                   fontsize=10, transform=ax.transAxes)
-    ax.text(0.07, 0.80, r'$v_2^{true}=$' + '{:.2}'.format(v2true), color='crimson',
+    ax.text(0.07, 0.85, r'$v_2^{true}=$' + '{:.2}'.format(v2true[2]), color='crimson',
                    fontsize=10, transform=ax.transAxes)
 
 
