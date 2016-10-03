@@ -3,3 +3,9 @@
 
 # Ignore build files
 *.pyc
+*.d
+*.so
+*.pcm
+
+# Ignore log files
+*.log
