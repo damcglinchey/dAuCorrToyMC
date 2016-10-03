@@ -2,12 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def gen_part(vn, psi, order=2, N=100):
+def gen_part(vn, psi, order=2, N=100, sigN=0):
     '''
     Generate random set of particles
     '''
-    rand = np.zeros(N)
-    for i in range(N):
+    Np = N
+    if sigN > 0:
+        Np = np.random.poisson(N)
+        # Np = int(np.random.normal(N, sigN))
+    rand = np.zeros(Np)
+    for i in range(Np):
         acc = False
         while acc is False:
             rphi = np.random.uniform(-np.pi, np.pi, 1)
